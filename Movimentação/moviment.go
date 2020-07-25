@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"runtime"
@@ -92,7 +93,7 @@ type Cliente struct {
 func (c *Cliente) Verifica(Nconta string, Pass string) (er error) {
 	arquivo, err := LeArquivo()
 	if err != nil {
-		panic(err)
+		return errors.New("Erro: Não foi possível ler o arquivo!!")
 	}
 	for _, item := range arquivo {
 		campo := strings.Split(item, ",")
@@ -135,6 +136,119 @@ func (c Cliente) VerSaldo() {
 	fmt.Printf("\t|  Saldo -> %.2f\n", c.Saldo)
 	fmt.Println("\t| \a")
 	fmt.Println("\t|________________________________")
+}
+
+func (c *Cliente) Sacar() {
+	for {
+		limpaTela()
+		var esc string
+		fmt.Print("\a \v")
+		fmt.Print("\t ____________________________________\n")
+		fmt.Print("\t|                                    |\n")
+		fmt.Print("\t|                SAQUE               |\n")
+		fmt.Print("\t|                                    |\n")
+		fmt.Print("\t|====================================|\n")
+		fmt.Print("\t|                                    |\n")
+		fmt.Print("\t|  1 - R$ 50,00    3 - R$ 100,00     |\n")
+		fmt.Print("\t|                                    |\n")
+		fmt.Print("\t|  2 - R$ 75,00    4 - Outro valor   |\n")
+		fmt.Print("\t|                                    |\n")
+		fmt.Print("\t|____________________________________|\n")
+		fmt.Print("\t|____________________________________|\n")
+		fmt.Print("\t| [++]>> ")
+		scanner := bufio.NewScanner(os.Stdin)
+		for scanner.Scan() {
+			esc = scanner.Text()
+			break
+		}
+		if scanner.Err() != nil {
+			fmt.Println("\tErro: Número Inválido!")
+			time.Sleep(time.Second + 2)
+		}
+		if es, err := strconv.Atoi(esc); err != nil || es < 1 || es > 4 {
+			fmt.Println("\tErro: Número Inválido!")
+			time.Sleep(time.Second + 2)
+		} else {
+			arquivo, err := LeArquivo()
+			if err != nil {
+				fmt.Println("\tErro: Não foi possível ler o arquivo!!")
+				break
+			}
+			var str string
+
+			for _, linha := range arquivo {
+				campo := strings.Split(linha, ",")
+				if c.Nconta == campo[0] && esc != "" {
+					var nsaldo string
+					switch es {
+					case 1:
+						nsaldo = "50.00"
+					case 2:
+						nsaldo = "75.00"
+					case 3:
+						nsaldo = "100.00"
+					case 4:
+						for {
+							fmt.Print("\t Digite o valor: ")
+							for scanner.Scan() {
+								nsaldo = scanner.Text()
+								break
+							}
+							if scanner.Err() != nil {
+								fmt.Println("\tErro: Número Inválido!")
+							}
+							if _, err := strconv.ParseFloat(nsaldo, 32); err != nil {
+								fmt.Println("\tErro: Número Inválido!")
+								time.Sleep(time.Second + 2)
+							} else {
+								break
+							}
+						}
+					}
+					nesaldo, err := strconv.ParseFloat(nsaldo, 32)
+					if err != nil {
+						fmt.Println("\tErro: Número Inválido!")
+						time.Sleep(time.Second + 2)
+						continue
+					}
+					if float32(nesaldo) > c.Saldo {
+						fmt.Println("\tErro: Valor do saque maior do que o saldo!!")
+						time.Sleep(time.Second + 2)
+						continue
+					} else if nesaldo < 25.0 {
+						fmt.Println("\tErro: Valor do saque Inválido!!")
+						time.Sleep(time.Second + 2)
+						continue
+					} else {
+						c.Saldo -= float32(nesaldo)
+						nsaldo = fmt.Sprintf("%.2f", c.Saldo)
+						campo[2] = nsaldo
+					}
+					var nlinha string
+					for y := 0; y < len(campo); y++ {
+						nlinha += campo[y]
+						if y != len(campo)-1 {
+							nlinha += ","
+						}
+					}
+					linha = nlinha
+					esc = ""
+				}
+				str += linha + "\n"
+			}
+			fmt.Println(str)
+			err = ioutil.WriteFile("db.txt", []byte(str), 0644)
+			if err != nil {
+				panic(err)
+			}
+			err = c.Verifica(c.Nconta, c.Pass)
+			if err != nil {
+				panic(err)
+			}
+			fmt.Println("Saldo ->", c.Saldo)
+			break
+		}
+	}
 }
 
 func main() {
@@ -217,7 +331,10 @@ func main() {
 						fmt.Print("\tTecle para continuar...")
 						fmt.Scanln(&esc)
 					case 2:
-						fmt.Println("Saque")
+						c.Sacar()
+						fmt.Println()
+						fmt.Print("\tTecle para continuar...")
+						fmt.Scanln(&esc)
 					case 3:
 						fmt.Println("Depósito")
 					case 4:
